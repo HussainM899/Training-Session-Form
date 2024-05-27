@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <script>
+    function populateDropdown(id, options) {
+      var select = document.getElementById(id);
+      select.innerHTML = '';
+      options.forEach(function(option) {
+        var opt = document.createElement('option');
+        opt.value = option;
+        opt.innerHTML = option;
+        select.appendChild(opt);
+      });
+    }
+
+    function fetchAndPopulateDropdown(type, value, targetId) {
+      google.script.run.withSuccessHandler(function(options) {
+        populateDropdown(targetId, options);
+      }).fetchOptions(type, value);
+    }
+
+    function onDivisionChange() {
+      var division = document.getElementById('division').value;
+      fetchAndPopulateDropdown('district', division, 'district');
+      document.getElementById('tehsil').innerHTML = ''; // Clear Tehsil dropdown
+      document.getElementById('uc').innerHTML = ''; // Clear UC dropdown
+      document.getElementById('venue').innerHTML = ''; // Clear Venue dropdown
+    }
+
+    function onDistrictChange() {
+      var district = document.getElementById('district').value;
+      fetchAndPopulateDropdown('tehsil', district, 'tehsil');
+      document.getElementById('uc').innerHTML = ''; // Clear UC dropdown
+      document.getElementById('venue').innerHTML = ''; // Clear Venue dropdown
+    }
+
+    function onTehsilChange() {
+      var tehsil = document.getElementById('tehsil').value;
+      fetchAndPopulateDropdown('uc', tehsil, 'uc');
+      fetchAndPopulateDropdown('venue', tehsil, 'venue');
+    }
+
+    function onCadreChange() {
+      var cadre = document.getElementById('cadre').value;
+      var specialCadres = ["UC Ops", "UC Comms", "AIC/UCMOs"];
+      if (specialCadres.includes(cadre)) {
+        document.getElementById('ucContainer').style.display = 'none';
+        document.getElementById('uc').innerHTML = ''; // Clear UC dropdown
+      } else {
+        document.getElementById('ucContainer').style.display = 'block';
+        onTehsilChange(); // Update UC dropdown based on tehsil
+      }
+      onTehsilChange(); // Always update Venue dropdown
+    }
+
+    function onVenueChange() {
+      var venue = document.getElementById('venue').value;
+      if (venue === 'Other') {
+        document.getElementById('otherVenueContainer').style.display = 'block';
+        document.getElementById('otherVenue').required = true;
+      } else {
+        document.getElementById('otherVenueContainer').style.display = 'none';
+        document.getElementById('otherVenue').required = false;
+      }
+    }
+
+    function validateTime() {
+      var time = document.getElementById('time').value;
+      var timeParts = time.split(':');
+      var hour = parseInt(timeParts[0]);
+      var minute = parseInt(timeParts[1]);
+
+      if (hour < 8 || (hour >= 15 && minute > 0) || hour > 15) {
+        alert('Please enter a time between 8:00 AM and 3:00 PM.');
+        return false;
+      }
+      return true;
+    }
+
+    function validateEmail(email) {
+      var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailPattern.test(email) || email.toUpperCase() === "N/A";
+    }
+
+    function resetForm() {
+      document.getElementById('form').reset();
+      fetchAndPopulateDropdown('division', '', 'division');
+      fetchAndPopulateDropdown('cadre', '', 'cadre');
+      document.getElementById('district').innerHTML = '<option value="" disabled selected>Select District</option>';
+      document.getElementById('tehsil').innerHTML = '<option value="" disabled selected>Select Tehsil</option>';
+      document.getElementById('uc').innerHTML = '<option value="" disabled selected>Select UC</option>';
+      document.getElementById('venue').innerHTML = '<option value="" disabled selected>Select Venue</option>';
+      document.getElementById('otherVenueContainer').style.display = 'none';
+    }
+
+    function onSubmit() {
+      if (!validateTime()) {
+        return;
+      }
+
+      var data = {
+        division: document.getElementById('division').value,
+        district: document.getElementById('district').value,
+        tehsil: document.getElementById('tehsil').value,
+        cadre: document.getElementById('cadre').value,
+        uc: document.getElementById('uc').value,
+        venue: document.getElementById('venue').value,
+        otherVenueText: document.getElementById('otherVenue').value,
+        date: document.getElementById('date').value,
+        time: document.getElementById('time').value,
+        facilitator: document.getElementById('facilitator').value,
+        coFacilitator: document.getElementById('coFacilitator').value,
+        monitor: document.getElementById('monitor').value,
+        monitorEmail: document.getElementById('monitorEmail').value,
+        expectedMale: document.getElementById('expectedMale').value,
+        expectedFemale: document.getElementById('expectedFemale').value
+      };
+
+      // Log data to ensure it's correct
+      console.log('Form data:', data);
+
+      // Validate email
+      if (!validateEmail(data.monitorEmail)) {
+        alert('Please enter a valid email address or "N/A".');
+        return;
+      }
+
+      // Validate monitor's name
+      if (data.monitor === data.facilitator) {
+        alert('The name of the monitor cannot be the same as the facilitator\'s name.');
+        return;
+      }
+
+      google.script.run.withSuccessHandler(function(response) {
+        if (response.success) {
+          alert('Form submitted successfully!');
+          resetForm();
+          document.getElementById('submitBtn').innerHTML = 'Submit Another Form';
+        } else {
+          alert('Error: ' + response.message);
+        }
+      }).submitForm(data);
+    }
+
+    window.onload = function() {
+      fetchAndPopulateDropdown('division', '', 'division');
+      fetchAndPopulateDropdown('cadre', '', 'cadre');
+    };
+  </script>
+</head>
+<body>
+  <div class="container mt-5">
+    <h2>Training Session Form</h2>
+    <form id="form" onsubmit="event.preventDefault(); onSubmit();">
+      <div class="form-group">
+        <label for="division">Division</label>
+        <select class="form-control" id="division" name="division" onchange="onDivisionChange()" required>
+          <option value="" disabled selected>Select Division</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="district">District</label>
+        <select class="form-control" id="district" name="district" onchange="onDistrictChange()" required>
+          <option value="" disabled selected>Select District</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="tehsil">Tehsil</label>
+        <select class="form-control" id="tehsil" name="tehsil" onchange="onTehsilChange()" required>
+          <option value="" disabled selected>Select Tehsil</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="cadre">Cadre</label>
+        <select class="form-control" id="cadre" name="cadre" onchange="onCadreChange()" required>
+          <option value="" disabled selected>Select Cadre</option>
+        </select>
+      </div>
+      <div class="form-group" id="ucContainer">
+        <label for="uc">Union Council</label>
+        <select class="form-control" id="uc" name="uc" required>
+          <option value="" disabled selected>Select UC</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="venue">Venue</label>
+        <select class="form-control" id="venue" name="venue" onchange="onVenueChange()" required>
+          <option value="" disabled selected>Select Venue</option>
+        </select>
+      </div>
+      <div class="form-group" id="otherVenueContainer" style="display:none;">
+        <label for="otherVenue">Specify Other Venue</label>
+        <input type="text" class="form-control" id="otherVenue" name="otherVenue">
+      </div>
+      <div class="form-group">
+        <label for="date">Date</label>
+        <input type="date" class="form-control" id="date" name="date" required>
+      </div>
+      <div class="form-group">
+        <label for="time">Time</label>
+        <input type="time" class="form-control" id="time" name="time" required>
+      </div>
+      <div class="form-group">
+        <label for="facilitator">Facilitator</label>
+        <input type="text" class="form-control" id="facilitator" name="facilitator" required>
+      </div>
+      <div class="form-group">
+        <label for="coFacilitator">Co-Facilitator</label>
+        <input type="text" class="form-control" id="coFacilitator" name="coFacilitator" required>
+      </div>
+      <div class="form-group">
+        <label for="monitor">Monitor</label>
+        <input type="text" class="form-control" id="monitor" name="monitor" required>
+      </div>
+      <div class="form-group">
+        <label for="monitorEmail">Monitor Email Registered with NEOC</label>
+        <input type="text" class="form-control" id="monitorEmail" name="monitorEmail" required>
+      </div>
+      <div class="form-group">
+        <label for="expectedMale">Expected Male Participants</label>
+        <input type="number" class="form-control" id="expectedMale" name="expectedMale" required>
+      </div>
+      <div class="form-group">
+        <label for="expectedFemale">Expected Female Participants</label>
+        <input type="number" class="form-control" id="expectedFemale" name="expectedFemale" required>
+      </div>
+      <button type="submit" id="submitBtn" class="btn btn-primary">Submit</button>
+    </form>
+    <div id="message"></div>
+  </div>
+</body>
+</html>
